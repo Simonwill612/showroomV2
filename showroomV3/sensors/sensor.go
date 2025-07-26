@@ -25,7 +25,6 @@ const (
 	CH_ACS1 = 0
 	CH_ACS2 = 1
 )
-
 // Init initializes GPIO
 func Init() error {
 	if err := rpio.Open(); err != nil {

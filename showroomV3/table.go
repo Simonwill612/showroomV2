@@ -110,7 +110,7 @@ func SimulatePulse(dir string, durationMs int) {
 		pulseCount1 -= delta
 		pulseCount2 -= delta
 	}
-}
+} 
 
 // Hàm nâng/hạ bàn theo thời gian
 func MoveTable(dir string, durationMs int) {

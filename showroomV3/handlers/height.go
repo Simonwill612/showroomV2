@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"showroom/sensors"
 ) 
-
 func HeightsHandler(w http.ResponseWriter, r *http.Request) {
 	left, right, err := sensors.GetBothHeights()
 	if err != nil {
