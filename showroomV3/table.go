@@ -105,7 +105,7 @@ func SimulatePulse(dir string, durationMs int) {
 	delta := int64(float64(durationMs) / 10) // mỗi 10ms = 1 pulse
 	if dir == "UP" {
 		pulseCount1 += delta
-		pulseCount2 += delta
+		pulseCount2 += delta 
 	} else if dir == "DOWN" {
 		pulseCount1 -= delta
 		pulseCount2 -= delta

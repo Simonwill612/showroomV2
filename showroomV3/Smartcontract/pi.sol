@@ -24,7 +24,7 @@ function lowerTable(string memory tableId) public {
     emit LowerTable(tableId);
     emit TableCommand(tableId, "DOWN");
     tableIdCommand[tableId] = "DOWN";
-}
+} 
 
 function stopTable(string memory tableId) public {
     emit StopTable(tableId);

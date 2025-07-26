@@ -19,7 +19,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// const eventName = "Emit"
+// const eventName = "Emit" 
 
 func main() {
 	loadEnv()

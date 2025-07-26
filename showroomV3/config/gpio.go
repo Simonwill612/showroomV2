@@ -1,6 +1,6 @@
 package config
 
-const (
+const ( 
 	// Relay Pins
 	RELAY_PIN_1 = 17 // GPIO17 - Pin 11
 	RELAY_PIN_2 = 27 // GPIO27 - Pin 13
