@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Showroom Controller UI</title>
+  <style>
+    body {
+      background: #f7f8fa;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 24px 32px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    .title {
+      font-size: 2rem;
+      margin: 0;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    .subtitle {
+      color: #718096;
+      margin-bottom: 0;
+    }
+
+    .section {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .form-group {
+      margin: 12px 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    input[type="password"],
+    input[type="number"] {
+      padding: 8px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 6px;
+      background: #3182ce;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: #2563eb;
+    }
+
+    .loading {
+      display: none;
+      color: #718096;
+      font-style: italic;
+      margin-top: 8px;
+    }
+
+    .height-display {
+      font-size: 1.5rem;
+      color: #38a169;
+      font-weight: bold;
+      margin: 12px 0;
+      text-align: center;
+    }
+
+    .height-form {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+    }
+
+    .height-form input {
+      width: 80px;
+      text-align: right;
+    }
+
+    .relay-btns,
+    .table-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 10px 0;
+      justify-content: center;
+    }
+
+    #connectStatus {
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    #walletAddress {
+      color: #2b6cb0;
+      font-size: 1rem;
+      margin-top: 4px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🛋</div>
+      <h1 class="title">Showroom Controller</h1>
+      <p class="subtitle">Điều khiển bàn showroom qua Smart Contract</p>
+    </div>
+
+    <div class="section" id="connectSection">
+      <h3>🔐 Kết nối Smart Contract</h3>
+      <div class="form-group">
+        <label for="privateKey">Private Key:</label>
+        <input type="password" value="0x113c62b9b9a956049a6690a3baa3f99d4a51c964e239e0355d65bf4fff59a34a"
+          id="privateKey" placeholder="Nhập Private Key" />
+      </div>
+      <button class="btn" onclick="connect()">🔐 Kết nối</button>
+      <div id="connectLoading" class="loading">Đang kết nối...</div>
+      <div id="connectStatus"></div>
+      <p id="walletAddress"></p>
+    </div>
+
+    <div class="section" id="heightSection">
+      <h2>📏 Chiều cao bàn hiện tại</h2>
+      <div class="height-display" id="heightDisplay">-- cm</div>
+      <form class="height-form" onsubmit="setTableHeight(event)">
+        <label for="targetHeight">Nhập chiều cao mong muốn (cm):</label>
+        <input type="number" id="targetHeight" min="60" max="120" step="1" required />
+        <button class="btn" type="submit">Nâng/Hạ bàn</button>
+      </form>
+    </div>
+
+    <div class="section" id="controlSection">
+      <h2>🎮 Điều Khiển Bàn (Mặc định: Bàn 1)</h2>
+      <div class="table-btns">
+        <button class="btn" onclick="raiseTable()">Nâng bàn</button>
+        <button class="btn" onclick="lowerTable()">Hạ bàn</button>
+        <button class="btn" onclick="stopTable()">Dừng bàn</button>
+        <button class="btn" onclick="lowerToDefault()">Hạ về mặc định (80cm)</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.6.2/dist/ethers.umd.min.js"></script>
+  <script>
+    let provider, wallet, contract;
+
+    const CONTRACT_ADDRESS = "0xF2C81EBb17875cA6Be5D976FaC487c0C1F5B434C";
+    const RPC_URL = "wss://rpc-proxy-sequoia.iqnb.com:8446/ws";
+    const ABI = [
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "heightsCm",
+				"type": "string"
+			}
+		],
+		"name": "EmitTableData",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			}
+		],
+		"name": "HeightSet",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "lowerTable",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "LowerTable",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "raiseTable",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "RaiseTable",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "height",
+				"type": "uint256"
+			}
+		],
+		"name": "setHeight",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "stopTable",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			}
+		],
+		"name": "StopTable",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "command",
+				"type": "string"
+			}
+		],
+		"name": "TableCommand",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "heightsCm",
+				"type": "string"
+			}
+		],
+		"name": "tableHandleAI",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "relayOn",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "tableData",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "tableId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "heightsCm",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "targetHeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+
+    const TABLE_ID = "1"; // hoặc "1" nếu bạn dùng số
+
+    window.connect = async function () {
+  const pk = document.getElementById("privateKey").value.trim();
+  const loading = document.getElementById("connectLoading");
+  const status = document.getElementById("connectStatus");
+
+  if (!pk) {
+    alert("Vui lòng nhập private key");
+    return;
+  }
+
+  loading.style.display = "block";
+
+  try {
+    provider = new ethers.WebSocketProvider(RPC_URL);
+    wallet = new ethers.Wallet(pk, provider);
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+
+    const address = await wallet.getAddress();
+    document.getElementById("walletAddress").innerText = `👛 Ví: ${address}`;
+    status.innerText = "✅ Kết nối thành công!";
+  } catch (err) {
+    status.innerText = "❌ Lỗi: " + err.message;
+    console.error(err);
+  } finally {
+    loading.style.display = "none";
+  }
+
+  keepWebSocketAlive();
+}
+
+    // Gọi eth_chainId mỗi 30 giây để giữ WebSocket sống
+    function keepWebSocketAlive() {
+      if (!provider || !provider.send) {
+        console.warn("⚠️ WebSocket provider chưa khởi tạo hoặc không hợp lệ.");
+        return;
+      }
+
+      setInterval(async () => {
+        try {
+          const chainId = await provider.send("eth_chainId", []);
+          console.log(`🔄 Keep-alive | Chain ID: ${parseInt(chainId, 16)}`);
+        } catch (err) {
+          console.warn("⚠️ Keep-alive thất bại:", err.message);
+        }
+      }, 30000); // 30 giây
+    }
+    async function sendContract(methodName, ...params) {
+  if (!contract || !wallet) {
+    alert("❌ Vui lòng kết nối ví trước");
+    return;
+  }
+
+  try {
+    const tx = await contract[methodName](...params);
+    console.log(`🚀 TX gửi: ${tx.hash}`);
+
+    const status = document.getElementById("connectStatus");
+    status.innerHTML = `🚀 Gửi TX thành công<br>🔗 <a href="https://rpc-proxy-sequoia.iqnb.com:8446/tx/${tx.hash}" target="_blank">${tx.hash}</a>`;
+
+    // ✅ Thay vì gọi tableIdCommand → dùng tableData
+    const data = await contract.tableData(TABLE_ID);
+    console.log("📊 Trạng thái hiện tại của bàn:", data);
+
+    await tx.wait();
+    console.log(`✅ TX xác nhận thành công: ${tx.hash}`);
+  } catch (err) {
+    console.error(`❌ Lỗi khi gọi ${methodName}:`, err);
+    console.log(`❌ Lỗi gọi hàm ${methodName}: ${err.message}`);
+  }
+}
+
+
+    async function raiseTable() {
+      await sendContract("raiseTable", TABLE_ID);
+    }
+
+    async function lowerTable() {
+      await sendContract("lowerTable", TABLE_ID);
+    }
+
+    async function stopTable() {
+      await sendContract("stopTable", TABLE_ID);
+    }
+
+    async function lowerToDefault() {
+      await sendContract("setHeight", TABLE_ID, 80);
+    }
+
+    async function setTableHeight(e) {
+      e.preventDefault();
+      const targetHeight = Number(document.getElementById("targetHeight").value);
+      if (isNaN(targetHeight) || targetHeight < 60 || targetHeight > 120) {
+        console.log("Chiều cao phải từ 60 đến 120 cm");
+        return;
+      }
+      await sendContract("setHeight", TABLE_ID, targetHeight);
+    }
+
+    // Gửi dữ liệu AI (nếu cần)
+    async function sendAIData(heightsCm) {
+      await sendContract("tableHandleAI", TABLE_ID, heightsCm);
+    }
+
+    // Demo chiều cao TOF nếu chưa có API backend
+/*
+func HeightHandler(w http.ResponseWriter, r *http.Request) {
+    height, err := sensors.GetHeightVL53L0X(0x29) // Địa chỉ mặc định
+    if err != nil {
+        http.Error(w, err.Error(), 500)
+        return
+    }
+    json.NewEncoder(w).Encode(map[string]int{"height_cm": height})
+}
+*/
+
+async function fetchHeights() {
+  const res = await fetch("/api/heights");
+  const data = await res.json();
+  document.getElementById("heightDisplay").innerText =
+    `Trái: ${data.left_cm} cm | Phải: ${data.right_cm} cm`;
+  if (Math.abs(data.diff) > 1) {
+    alert("⚠️ Lệch xi lanh! Dừng bàn ngay.");
+  }
+}
+
+// Gọi fetchHeights mỗi 2 giây
+setInterval(fetchHeights, 2000);
+
+
+  </script>
+</body>
+
+</html>
